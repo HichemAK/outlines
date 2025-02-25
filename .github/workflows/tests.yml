@@ -1,28 +1,25 @@
 name: Tests
 
+# Runs every day at 06:00 UTC
 on:
-  pull_request:
-    branches: [main,v1.0]
-  push:
-    branches: [main]
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
 
 jobs:
-  style:
-    name: Check the code style
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
-      with:
-        python-version: "3.10"
-    - uses: pre-commit/action@v3.0.0
-
   tests:
     name: Run the tests
     runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      DOTTXT_API_KEY: ${{ secrets.DOTTXT_API_KEY }}
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.10"]
+
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
@@ -51,66 +48,14 @@ jobs:
         echo "::set-output name=id::$MATRIX_ID"
     - name: Run tests
       run: |
-        uv run pytest -x --cov=outlines -m 'not api_call'
+        uv run pytest -x --cov=outlines
       env:
         COVERAGE_FILE: .coverage.${{ steps.matrix-id.outputs.id }}
-    - name: Upload coverage data
-      uses: actions/upload-artifact@v4
+    - name: Slack notification on failure
+      if: failure()
+      uses: 8398a7/action-slack@v3
       with:
-        name: coverage-data
-        path: .coverage.*
-        if-no-files-found: ignore
-        include-hidden-files: true
-        # TODO FIXME: This is only using the last run
-        overwrite: true
-
-  coverage:
-    name: Combine & check coverage.
-    needs: tests
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-python@v4
-        with:
-          cache: pip
-          python-version: "3.11"
-
-      - name: Set up environment
-        run: |
-          pip install --upgrade "coverage[toml]>=5.1" diff-cover
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: coverage-data
-
-      - name: Fetch main for coverage diff
-        run: |
-          git fetch --no-tags --prune origin main
-
-      - name: Combine coverage & fail if it's <100%.
-        run: |
-          python -m coverage combine
-          python -m coverage html --skip-covered --skip-empty
-          python -m coverage xml
-          diff-cover coverage.xml --markdown-report=coverage.md --fail-under=100 || (cat coverage.md >> $GITHUB_STEP_SUMMARY && exit 1)
-
-      - name: Upload HTML report if check failed.
-        uses: actions/upload-artifact@v4
-        with:
-          name: html-report
-          path: htmlcov
-          # TODO FIXME: This is only using the last run
-          overwrite: true
-        if: ${{ failure() }}
-
-  build-wheel:
-    name: Build Wheel and Test SDist
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Build SDist and Wheel
-        run: ./.github/scripts/build_sdist_and_wheel.sh
+        status: ${{ job.status }}
+        fields: commit,author,ref
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_TESTS_ERRORS_WEBHOOK_URL }}
