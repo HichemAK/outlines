@@ -31,13 +31,14 @@ import torch
 from outlines_core.fsm.json_schema import build_regex_from_schema
 from pydantic import BaseModel
 
-from outlines.fsm.guide import CFGGuide, Guide, RegexGuide
+from outlines.fsm.guide import CFGGuide, Guide, RegexGuide, HyperChoiceGuide
 from outlines.fsm.json_schema import convert_json_schema_to_str
 
 from .base_logits_processor import OutlinesLogitsProcessor
 
 if TYPE_CHECKING:
     from outlines.models.tokenizer import Tokenizer
+
 
 
 class GuideLogitsProcessor(OutlinesLogitsProcessor):
@@ -149,6 +150,33 @@ class RegexLogitsProcessor(GuideLogitsProcessor):
             An Outlines tokenizer
         """
         guide = RegexGuide.from_regex(regex_string, tokenizer)
+        super().__init__(tokenizer=tokenizer, guide=guide)
+
+
+
+class HyperChoiceLogitsProcessor(GuideLogitsProcessor):
+    """Bias generation based on a regular expression.
+
+    Attributes
+    ----------
+    tokenizer
+        The tokenizer used to convert tokens to ids.
+    guide
+        The `outlines.fsm.RegexGuide. which is used to bias the logits.
+    """
+
+    def __init__(self, choices: List[List[str]], tokenizer: "Tokenizer"):
+        """Compile the RegexGuide that drives the regex-guided generation.
+
+        Parameters
+        ----------
+        regex_string
+            A string that represents a regular expression
+        tokenizer
+            An Outlines tokenizer
+        """
+
+        guide = HyperChoiceGuide(choices, tokenizer)
         super().__init__(tokenizer=tokenizer, guide=guide)
 
 

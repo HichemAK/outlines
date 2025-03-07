@@ -43,6 +43,7 @@ dependencies = [
    "outlines_core==0.1.26",
    "genson",
    "pre-commit>=4.0.1",
+   "multi-choices-parser>=0.10.0"
 ]
 dynamic = ["version"]
 

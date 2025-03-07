@@ -1,7 +1,7 @@
 import collections
 import copy
 import warnings
-from typing import TYPE_CHECKING, Any, Generator, Union
+from typing import TYPE_CHECKING, Any, Generator, List, Union
 
 import torch
 from lark.indenter import DedentError
@@ -19,6 +19,8 @@ from outlines.fsm.parsing import PartialLark, PartialParserState
 
 if TYPE_CHECKING:
     from outlines.models.tokenizer import Tokenizer
+
+from multi_choices_parser import MultiChoicesParser
 
 
 Instruction = Union[Write, Generate]
@@ -95,6 +97,32 @@ class RegexGuide(CoreRegexGuide):
             _create_states_mapping=cached_create_states_mapping,
             **kwargs,
         )
+
+class HyperChoiceGuide(Guide):
+    """Guide to generate text that is in the language of a hyper-choice grammar."""
+
+    def __init__(self, list_choices: List[List[str]], tokenizer):
+        """
+        Construct the hyper-choice parser
+        """
+
+        self.initial_state = MultiChoicesParser([tokenizer.tokenizer(choices).input_ids for choices in list_choices], end_symb=tokenizer.tokenizer.eos_token_id)
+        self.tokenizer = tokenizer
+
+    def get_next_instruction(self, state: MultiChoicesParser) -> Instruction:
+        return Generate(torch.tensor(state.next(), dtype=torch.int64))
+
+    def get_next_state(self, state: MultiChoicesParser, token_id: int) -> MultiChoicesParser:
+        state = state.copy()
+        state.step(token_id)
+        return state
+
+    def is_final_state(self, state: MultiChoicesParser):
+        return state.finished
+
+    def copy(self):
+        return self.copy()
+
 
 
 CFGState = collections.namedtuple("CFGState", ["parser_state", "prev_token"])
