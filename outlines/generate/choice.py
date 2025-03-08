@@ -14,10 +14,11 @@ from outlines.samplers import Sampler, multinomial
 from .json import json
 from .regex import regex
 
+from outlines.processors import HyperChoiceLogitsProcessor
 
 @singledispatch
 def choice(
-    model, choices: Union[List[str], List[List[str]], type[Enum], list[type[Enum]]], sampler: Sampler = multinomial()
+    model, choices: Union[List[str], type[Enum]], sampler: Sampler = multinomial()
 ) -> SequenceGeneratorAdapter:
     if isinstance(choices, type(Enum)):
         regex_str = build_regex_from_schema(pyjson.dumps(get_schema_from_enum(choices)))
@@ -32,17 +33,6 @@ def choice(
         generator.format_sequence = lambda x: x
 
     return generator
-
-@singledispatch
-def hyperchoice(
-    model, choices: List[List[str]], sampler: Sampler = multinomial()
-) -> SequenceGeneratorAdapter:
-
-    from outlines.processors import HyperChoiceLogitsProcessor
-
-    logits_processor = HyperChoiceLogitsProcessor(choices, tokenizer=model.tokenizer)
-    return SequenceGeneratorAdapter(model, logits_processor, sampler)
-
 
 @choice.register(OpenAI)
 def choice_openai(
@@ -67,3 +57,12 @@ def choice_openai(
         return generator(*args, **kwargs)["result"]
 
     return generate_choice
+
+@singledispatch
+def hyperchoice(
+    model, choices: Union[List[str], List[List[str]]], sampler: Sampler = multinomial()
+) -> SequenceGeneratorAdapter:
+    if len(choices) and isinstance(choices[0], str):
+        choices = [choices] # type: ignore
+    logits_processor = HyperChoiceLogitsProcessor(choices, tokenizer=model.tokenizer) # type: ignore
+    return SequenceGeneratorAdapter(model, logits_processor, sampler)

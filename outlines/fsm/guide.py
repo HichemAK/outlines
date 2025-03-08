@@ -20,7 +20,7 @@ from outlines.fsm.parsing import PartialLark, PartialParserState
 if TYPE_CHECKING:
     from outlines.models.tokenizer import Tokenizer
 
-from multi_choices_parser import MultiChoicesParser
+from multi_choices_parser import MultiChoicesParser # type: ignore
 
 
 Instruction = Union[Write, Generate]
