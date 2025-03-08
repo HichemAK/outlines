@@ -58,7 +58,6 @@ def choice_openai(
 
     return generate_choice
 
-@singledispatch
 def hyperchoice(
     model, choices: Union[List[str], List[List[str]]], sampler: Sampler = multinomial()
 ) -> SequenceGeneratorAdapter:
